@@ -10,16 +10,16 @@
       "training":true,
       "name": "msrvtt_ret",
       "txt": "datasets/annotations/msrvtt/descs_ret_train.json",
-      "vision": "/mnt/media/HDD_4TB/giordano/MSRVTT/videos/videos",
-      "audio": "/mnt/media/HDD_4TB/giordano/MSRVTT/audios",
+      "vision": "datasets/srcdata/msrvtt/videos",
+      "audio": "datasets/srcdata/msrvtt/audios",
       "vision_transforms":"crop_flip",
       "vision_format": "video_rawvideo",
       "vision_sample_num": 4,
       "audio_sample_num": 1,   
       "task" : "ret%tv%ta",
       "epoch": 4,
-      "n_workers":8,
-      "batch_size": 32}], 
+      "n_workers":4,
+      "batch_size": 16}], 
   "val":                
     [{
         "type":"annoindexed",
@@ -28,13 +28,13 @@
         "txt": "datasets/annotations/msrvtt/descs_ret_test.json",
         "vision_transforms":"crop_flip",
         "vision_format": "video_rawvideo",
-        "vision": "/mnt/media/HDD_4TB/giordano/MSRVTT/video_test",
-        "audio": "/mnt/media/HDD_4TB/giordano/MSRVTT/audio_test",
-        "vision_sample_num": 8, 
+        "vision": "datasets/srcdata/msrvtt/videos",
+        "audio": "datasets/srcdata/msrvtt/audios",
+        "vision_sample_num": 4, 
         "audio_sample_num": 1,   
         "task" : "ret%tvas",
-        "n_workers": 8,
-        "batch_size": 64 
+        "n_workers": 0,
+        "batch_size": 8
     }]}}
 
 
