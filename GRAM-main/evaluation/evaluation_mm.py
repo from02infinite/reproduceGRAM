@@ -433,6 +433,21 @@ def evaluate_ret(model, tasks, val_loader, global_step):
         feat_d = torch.cat(feat_d, dim=0)
         feat_d = ddp_allgather(feat_d)
 
+
+    max_query = 1000
+
+    # 只保留前1000个query相关内容
+    ids_txt = ids_txt[:max_query]
+    input_ids = input_ids[:max_query]
+    attention_mask = attention_mask[:max_query]
+    feat_t = feat_t[:max_query]
+
+    if len(feat_s) > 0:
+        feat_s = feat_s[:max_query]
+
+    if len(feat_d) > 0:
+        feat_d = feat_d[:max_query]
+
     # ====== 核心检索计时开始：GRAM/similarity + 双向 refine ======
     torch.cuda.synchronize()
     t0 = time()
@@ -445,6 +460,12 @@ def evaluate_ret(model, tasks, val_loader, global_step):
             area = volume_computation4(feat_t, feat_v, feat_a, feat_s)
     else:
         area = volume_computation3(feat_t, feat_v, feat_a)
+
+    # text与video向量维数
+    LOGGER.info(f"feat_t shape: {feat_t.shape}")
+    LOGGER.info(f"feat_v shape: {feat_v.shape}")
+    LOGGER.info(f"ids_txt num: {len(ids_txt)}")
+    LOGGER.info(f"ids num: {len(ids)}")
 
     torch.cuda.synchronize()
     t1 = time()
@@ -462,9 +483,16 @@ def evaluate_ret(model, tasks, val_loader, global_step):
     log = {k.replace('backward', 'volume_D2T'): v for k, v in log.items()}
     val_log['ret_area_backard'] = log
 
+    # store_dict[f'condition_feats_{task}'] = torch.cat(
+    #     store_dict[f'condition_feats_{task}'], dim=0
+    # )
+    # itm_rerank_num = model.config.itm_rerank_num
+
     store_dict[f'condition_feats_{task}'] = torch.cat(
         store_dict[f'condition_feats_{task}'], dim=0
     )
+    store_dict[f'condition_feats_{task}'] = store_dict[f'condition_feats_{task}'][:max_query]
+
     itm_rerank_num = model.config.itm_rerank_num
 
     # ====== refine forward ======
