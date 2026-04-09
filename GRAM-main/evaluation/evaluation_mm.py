@@ -2,6 +2,7 @@ import os
 import json
 import torch
 import numpy as np
+import time
 from time import time
 import torch.distributed as dist
 from tqdm import tqdm 
@@ -170,6 +171,193 @@ def evaluate_cap(model, tasks, eval_loader, run_cfg, global_step, dset_name):
 
 
 @torch.no_grad()
+# def evaluate_ret(model, tasks, val_loader, global_step):
+#     print(">>> len(val_loader):", len(val_loader))
+#     val_log = {}
+#     ids = []
+#     ids_txt = []
+#     input_ids = []
+#     attention_mask = []
+ 
+#     subtasks = tasks.split('%')[1:]
+#     store_dict = {}
+#     feat_t = []
+#     feat_a = []
+#     feat_v = []
+#     feat_s = []
+#     feat_d = []
+
+#     for task in subtasks:
+#         # store_dict[f'feat_cond_{task}'] = []
+#         store_dict[f'condition_feats_{task}'] = []        
+
+#     for i, batch in tqdm(enumerate(val_loader), total=len(val_loader)):
+#         batch = edict(batch)
+#         evaluation_dict= model(batch, tasks, compute_loss=False)
+#         # evaluation_dict = {k: v.cpu() if isinstance(v, torch.Tensor) else v for k, v in evaluation_dict.items()}
+
+#         feat_t.append(evaluation_dict['feat_t'])
+#         feat_a.append(evaluation_dict['feat_a'])
+#         feat_v.append(evaluation_dict['feat_v'])
+#         if 'feat_s' in evaluation_dict.keys():
+#             feat_s.append(evaluation_dict['feat_s'])
+#         if 'feat_d' in evaluation_dict.keys():
+#             feat_d.append(evaluation_dict['feat_d'])
+      
+#         input_ids.append(evaluation_dict['input_ids'])
+#         attention_mask.append(evaluation_dict['attention_mask'])
+#         ids += batch.ids
+
+#         if 'ids_txt' in batch:
+#             if isinstance(batch['ids_txt'][0],list):
+#                 ids_txt  +=  [j for i in batch.ids_txt for j in i]
+#             else:
+#                 ids_txt  += batch.ids_txt
+#         else:    
+#             ids_txt  += batch.ids
+
+  
+#         for task in subtasks:
+#             # store_dict[f'feat_cond_{task}'].append(evaluation_dict[f'feat_cond_{task}'])    
+#             store_dict[f'condition_feats_{task}'].append(evaluation_dict[f'condition_feats_{task}'])
+
+        
+            
+#     ids = [j for i in all_gather_list(ids) for j in i]
+#     ids_txt = [j for i in all_gather_list(ids_txt) for j in i]
+#     input_ids = torch.cat([i for i in input_ids],dim=0)
+#     input_ids = ddp_allgather(input_ids)
+#     attention_mask = torch.cat([i for i in attention_mask],dim=0)
+#     attention_mask = ddp_allgather(attention_mask)
+        
+#     feat_t = torch.cat(feat_t, dim = 0)
+#     feat_t = ddp_allgather(feat_t)
+
+#     feat_a = torch.cat(feat_a, dim = 0)
+#     feat_a = ddp_allgather(feat_a)
+
+#     feat_v = torch.cat(feat_v, dim = 0)
+#     feat_v = ddp_allgather(feat_v)
+
+#     if len(feat_s)>0:
+#         feat_s = torch.cat(feat_s, dim = 0)
+#         feat_s = ddp_allgather(feat_s)
+
+#     if len(feat_d)>0:
+#         feat_d = torch.cat(feat_d, dim = 0)
+#         feat_d = ddp_allgather(feat_d)
+#     # torch.save(feat_t,f"./experiments/{global_step}text_features_msrvtt.pt")
+#     # torch.save(feat_v,f"./experiments/{global_step}video_features_msrvtt.pt")
+#     # torch.save(feat_a,f"./experiments/{global_step}audio_features_msrvtt.pt")
+#     #torch.save(feat_s,f"./experiments/{global_step}subtitles_features_msrvtt.pt")
+#     if len(feat_s)>0:
+#         if len(feat_d)>0:
+#             area = volume_computation5(feat_t,feat_v,feat_a,feat_s,feat_d)
+#         else:
+#             area = volume_computation4(feat_t,feat_v,feat_a,feat_s) #(feat_t,feat_v,feat_a)
+#     else:
+#         area = volume_computation3(feat_t,feat_v,feat_a)
+        
+#     min_values_volume = torch.min(area, 1).values
+#     mean_values_volume = torch.mean(min_values_volume)
+#     val_log[f"gramian_value"] = {"value": mean_values_volume.item()}
+    
+    
+#     log = compute_metric_ret_area(area, ids, ids_txt, direction='forward')
+#     log = {k.replace('forward','volume_T2D'): v for k,v in log.items()}
+
+#     val_log[f'ret_area_forward'] = log
+
+#     log = compute_metric_ret_area(area.T, ids, ids_txt, direction='forward')
+#     log = {k.replace('backward','volume_D2T'): v for k,v in log.items()}
+
+#     val_log[f'ret_area_backard'] = log
+
+#     # video_similarity = feat_t @ feat_v.T
+
+#     # log = compute_metric_ret_area((area - video_similarity), ids, ids_txt, direction='backward')
+#     # log = {k.replace('backward','area_video'): v for k,v in log.items()}
+#     # val_log[f'ret_area_back_with_video'] = log
+    
+
+#     store_dict[f'condition_feats_{task}'] = torch.cat(store_dict[f'condition_feats_{task}'],dim=0)
+#     itm_rerank_num = model.config.itm_rerank_num
+#     #itm_rerank_num = 30
+#     score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, -area , model, itm_rerank_num, direction='forward')#-(area-video_similarity)
+#     log = compute_metric_ret(score_matrix, ids, ids_txt, direction='forward')
+#     log = {k.replace('forward','volume_ITM_T2D'): v for k,v in log.items()}
+
+    
+#     score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, -area, model, itm_rerank_num, direction='backward') #-(area-video_similarity)
+#     log2 = compute_metric_ret(score_matrix, ids, ids_txt, direction='backward')
+#     log2 = {k.replace('backward','volume_ITM_D2T'): v for k,v in log2.items()}
+#     log.update(log2)
+    
+#     val_log[f'ret_itm_area'] = log
+    
+    
+#     cosine_TV = torch.matmul(feat_t, feat_v.permute(1,0))
+#     cosine_TV = compute_metric_ret(cosine_TV, ids, ids_txt, direction='forward')
+#     val_log[f'cosine_TV'] = cosine_TV
+    
+#     cosine_VT = torch.matmul(feat_v, feat_t.permute(1,0))
+#     cosine_VT = compute_metric_ret(cosine_VT, ids, ids_txt, direction='forward')
+#     val_log[f'cosine_VT'] = cosine_VT
+    
+#     cosine_TA = torch.matmul(feat_t, feat_a.permute(1,0))
+#     cosine_TA = compute_metric_ret(cosine_TA, ids, ids_txt, direction='forward')
+#     val_log[f'cosine_TA'] = cosine_TA
+    
+#     cosine_AT = torch.matmul(feat_a, feat_t.permute(1,0))
+#     cosine_AT = compute_metric_ret(cosine_AT, ids, ids_txt, direction='forward')
+#     val_log[f'cosine_AT'] = cosine_AT
+    
+#     ## compute itc_score
+#     for task in subtasks:
+#         if  task == "tvas" or task == "tva":
+#             continue
+#         #store_dict[f'feat_cond_{task}'] =  torch.cat(store_dict[f'feat_cond_{task}'], dim = 0)
+#         #store_dict[f'feat_cond_{task}'] = ddp_allgather(store_dict[f'feat_cond_{task}'])
+#         if task=='tv':
+#             score_matrix_t_cond = torch.matmul(feat_t, feat_v.permute(1,0))
+#         elif task=='ta':
+#             score_matrix_t_cond = torch.matmul(feat_t, feat_a.permute(1,0))
+#         store_dict[f'score_matrix_t_cond_{task}'] = score_matrix_t_cond
+#         log = compute_metric_ret(score_matrix_t_cond, ids, ids_txt, direction='forward')
+#         log = {k.replace('forward','video'): v for k,v in log.items()}
+#         if model.config.ret_bidirection_evaluation:
+#             log2 = compute_metric_ret(score_matrix_t_cond, ids, ids_txt, direction='backward')
+#             log2 = {k.replace('backward','txt'): v for k,v in log2.items()}
+#             log.update(log2)
+
+#         val_log[f'ret_itc_{task}'] = log
+
+
+#     #### compute itm_score
+#     for task in subtasks:
+#         if  task == "tvas" or task == "tva":
+#             continue
+#         if task!="tvas" and task!="tva":
+#             if isinstance(store_dict.get(f'condition_feats_{task}'), list):
+#                 store_dict[f'condition_feats_{task}'] = torch.cat(store_dict[f'condition_feats_{task}'],dim=0)
+#         itm_rerank_num = model.config.itm_rerank_num
+#         score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, store_dict[f'score_matrix_t_cond_{task}'], model, itm_rerank_num, direction='forward')
+#         log = compute_metric_ret(score_matrix, ids, ids_txt, direction='forward')
+#         log = {k.replace('forward','video'): v for k,v in log.items()}
+
+#         if model.config.ret_bidirection_evaluation:
+#             score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, store_dict[f'score_matrix_t_cond_{task}'], model, itm_rerank_num, direction='backward')
+#             log2 = compute_metric_ret(score_matrix, ids, ids_txt, direction='backward')
+#             log2 = {k.replace('backward','txt'): v for k,v in log2.items()}
+#             log.update(log2)
+
+#         val_log[f'ret_itm_{task}'] = log
+
+#     if dist.get_rank() == 0:
+#         wandb.log(val_log)
+        
+#     return val_log
+@torch.no_grad()
 def evaluate_ret(model, tasks, val_loader, global_step):
     val_log = {}
     ids = []
@@ -186,17 +374,16 @@ def evaluate_ret(model, tasks, val_loader, global_step):
     feat_d = []
 
     for task in subtasks:
-        # store_dict[f'feat_cond_{task}'] = []
         store_dict[f'condition_feats_{task}'] = []        
 
     for i, batch in tqdm(enumerate(val_loader), total=len(val_loader)):
         batch = edict(batch)
-        evaluation_dict= model(batch, tasks, compute_loss=False)
-        # evaluation_dict = {k: v.cpu() if isinstance(v, torch.Tensor) else v for k, v in evaluation_dict.items()}
+        evaluation_dict = model(batch, tasks, compute_loss=False)
 
         feat_t.append(evaluation_dict['feat_t'])
         feat_a.append(evaluation_dict['feat_a'])
         feat_v.append(evaluation_dict['feat_v'])
+
         if 'feat_s' in evaluation_dict.keys():
             feat_s.append(evaluation_dict['feat_s'])
         if 'feat_d' in evaluation_dict.keys():
@@ -207,145 +394,194 @@ def evaluate_ret(model, tasks, val_loader, global_step):
         ids += batch.ids
 
         if 'ids_txt' in batch:
-            if isinstance(batch['ids_txt'][0],list):
-                ids_txt  +=  [j for i in batch.ids_txt for j in i]
+            if isinstance(batch['ids_txt'][0], list):
+                ids_txt += [j for i in batch.ids_txt for j in i]
             else:
-                ids_txt  += batch.ids_txt
-        else:    
-            ids_txt  += batch.ids
+                ids_txt += batch.ids_txt
+        else:
+            ids_txt += batch.ids
 
   
         for task in subtasks:
-            # store_dict[f'feat_cond_{task}'].append(evaluation_dict[f'feat_cond_{task}'])    
-            store_dict[f'condition_feats_{task}'].append(evaluation_dict[f'condition_feats_{task}'])
+            store_dict[f'condition_feats_{task}'].append(
+                evaluation_dict[f'condition_feats_{task}']
+            )
 
-        
-            
     ids = [j for i in all_gather_list(ids) for j in i]
     ids_txt = [j for i in all_gather_list(ids_txt) for j in i]
-    input_ids = torch.cat([i for i in input_ids],dim=0)
+
+    input_ids = torch.cat([i for i in input_ids], dim=0)
     input_ids = ddp_allgather(input_ids)
-    attention_mask = torch.cat([i for i in attention_mask],dim=0)
+
+    attention_mask = torch.cat([i for i in attention_mask], dim=0)
     attention_mask = ddp_allgather(attention_mask)
         
-    feat_t = torch.cat(feat_t, dim = 0)
+    feat_t = torch.cat(feat_t, dim=0)
     feat_t = ddp_allgather(feat_t)
 
-    feat_a = torch.cat(feat_a, dim = 0)
+    feat_a = torch.cat(feat_a, dim=0)
     feat_a = ddp_allgather(feat_a)
 
-    feat_v = torch.cat(feat_v, dim = 0)
+    feat_v = torch.cat(feat_v, dim=0)
     feat_v = ddp_allgather(feat_v)
 
-    if len(feat_s)>0:
-        feat_s = torch.cat(feat_s, dim = 0)
+    if len(feat_s) > 0:
+        feat_s = torch.cat(feat_s, dim=0)
         feat_s = ddp_allgather(feat_s)
 
-    if len(feat_d)>0:
-        feat_d = torch.cat(feat_d, dim = 0)
+    if len(feat_d) > 0:
+        feat_d = torch.cat(feat_d, dim=0)
         feat_d = ddp_allgather(feat_d)
-    # torch.save(feat_t,f"./experiments/{global_step}text_features_msrvtt.pt")
-    # torch.save(feat_v,f"./experiments/{global_step}video_features_msrvtt.pt")
-    # torch.save(feat_a,f"./experiments/{global_step}audio_features_msrvtt.pt")
-    #torch.save(feat_s,f"./experiments/{global_step}subtitles_features_msrvtt.pt")
-    if len(feat_s)>0:
-        if len(feat_d)>0:
-            area = volume_computation5(feat_t,feat_v,feat_a,feat_s,feat_d)
+
+    # ====== 核心检索计时开始：GRAM/similarity + 双向 refine ======
+    torch.cuda.synchronize()
+    t0 = time()
+
+    # ====== similarity / volume computation ======
+    if len(feat_s) > 0:
+        if len(feat_d) > 0:
+            area = volume_computation5(feat_t, feat_v, feat_a, feat_s, feat_d)
         else:
-            area = volume_computation4(feat_t,feat_v,feat_a,feat_s) #(feat_t,feat_v,feat_a)
+            area = volume_computation4(feat_t, feat_v, feat_a, feat_s)
     else:
-        area = volume_computation3(feat_t,feat_v,feat_a)
-        
+        area = volume_computation3(feat_t, feat_v, feat_a)
+
+    torch.cuda.synchronize()
+    t1 = time()
+
     min_values_volume = torch.min(area, 1).values
     mean_values_volume = torch.mean(min_values_volume)
-    val_log[f"gramian_value"] = {"value": mean_values_volume.item()}
+    val_log["gramian_value"] = {"value": mean_values_volume.item()}
     
     
     log = compute_metric_ret_area(area, ids, ids_txt, direction='forward')
-    log = {k.replace('forward','volume_T2D'): v for k,v in log.items()}
-
-    val_log[f'ret_area_forward'] = log
+    log = {k.replace('forward', 'volume_T2D'): v for k, v in log.items()}
+    val_log['ret_area_forward'] = log
 
     log = compute_metric_ret_area(area.T, ids, ids_txt, direction='forward')
-    log = {k.replace('backward','volume_D2T'): v for k,v in log.items()}
+    log = {k.replace('backward', 'volume_D2T'): v for k, v in log.items()}
+    val_log['ret_area_backard'] = log
 
-    val_log[f'ret_area_backard'] = log
-
-    # video_similarity = feat_t @ feat_v.T
-
-    # log = compute_metric_ret_area((area - video_similarity), ids, ids_txt, direction='backward')
-    # log = {k.replace('backward','area_video'): v for k,v in log.items()}
-    # val_log[f'ret_area_back_with_video'] = log
-    
-
-    store_dict[f'condition_feats_{task}'] = torch.cat(store_dict[f'condition_feats_{task}'],dim=0)
+    store_dict[f'condition_feats_{task}'] = torch.cat(
+        store_dict[f'condition_feats_{task}'], dim=0
+    )
     itm_rerank_num = model.config.itm_rerank_num
-    #itm_rerank_num = 30
-    score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, -area , model, itm_rerank_num, direction='forward')#-(area-video_similarity)
-    log = compute_metric_ret(score_matrix, ids, ids_txt, direction='forward')
-    log = {k.replace('forward','volume_ITM_T2D'): v for k,v in log.items()}
 
-    
-    score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, -area, model, itm_rerank_num, direction='backward') #-(area-video_similarity)
+    # ====== refine forward ======
+    score_matrix = refine_score_matrix(
+        store_dict[f'condition_feats_{task}'],
+        input_ids,
+        attention_mask,
+        -area,
+        model,
+        itm_rerank_num,
+        direction='forward'
+    )
+    log = compute_metric_ret(score_matrix, ids, ids_txt, direction='forward')
+    log = {k.replace('forward', 'volume_ITM_T2D'): v for k, v in log.items()}
+
+    torch.cuda.synchronize()
+    t2 = time()
+
+    # ====== refine backward ======
+    score_matrix = refine_score_matrix(
+        store_dict[f'condition_feats_{task}'],
+        input_ids,
+        attention_mask,
+        -area,
+        model,
+        itm_rerank_num,
+        direction='backward'
+    )
     log2 = compute_metric_ret(score_matrix, ids, ids_txt, direction='backward')
-    log2 = {k.replace('backward','volume_ITM_D2T'): v for k,v in log2.items()}
+    log2 = {k.replace('backward', 'volume_ITM_D2T'): v for k, v in log2.items()}
     log.update(log2)
+
+    torch.cuda.synchronize()
+    t3 = time()
+
+    # ====== 核心检索时间日志 ======
+    LOGGER.info(f"[Similarity Time] {t1 - t0:.4f} sec")
+    LOGGER.info(f"[Refine Forward Time] {t2 - t1:.4f} sec")
+    LOGGER.info(f"[Refine Backward Time] {t3 - t2:.4f} sec")
+    LOGGER.info(f"[Refine Total Time] {t3 - t1:.4f} sec")
+    LOGGER.info(f"[Core Retrieval Time] {t3 - t0:.4f} sec")
+
+    val_log['ret_itm_area'] = log
     
-    val_log[f'ret_itm_area'] = log
     
-    
-    cosine_TV = torch.matmul(feat_t, feat_v.permute(1,0))
+    cosine_TV = torch.matmul(feat_t, feat_v.permute(1, 0))
     cosine_TV = compute_metric_ret(cosine_TV, ids, ids_txt, direction='forward')
-    val_log[f'cosine_TV'] = cosine_TV
+    val_log['cosine_TV'] = cosine_TV
     
-    cosine_VT = torch.matmul(feat_v, feat_t.permute(1,0))
+    cosine_VT = torch.matmul(feat_v, feat_t.permute(1, 0))
     cosine_VT = compute_metric_ret(cosine_VT, ids, ids_txt, direction='forward')
-    val_log[f'cosine_VT'] = cosine_VT
+    val_log['cosine_VT'] = cosine_VT
     
-    cosine_TA = torch.matmul(feat_t, feat_a.permute(1,0))
+    cosine_TA = torch.matmul(feat_t, feat_a.permute(1, 0))
     cosine_TA = compute_metric_ret(cosine_TA, ids, ids_txt, direction='forward')
-    val_log[f'cosine_TA'] = cosine_TA
+    val_log['cosine_TA'] = cosine_TA
     
-    cosine_AT = torch.matmul(feat_a, feat_t.permute(1,0))
+    cosine_AT = torch.matmul(feat_a, feat_t.permute(1, 0))
     cosine_AT = compute_metric_ret(cosine_AT, ids, ids_txt, direction='forward')
-    val_log[f'cosine_AT'] = cosine_AT
+    val_log['cosine_AT'] = cosine_AT
     
     ## compute itc_score
     for task in subtasks:
-        if  task == "tvas" or task == "tva":
+        if task == "tvas" or task == "tva":
             continue
-        #store_dict[f'feat_cond_{task}'] =  torch.cat(store_dict[f'feat_cond_{task}'], dim = 0)
-        #store_dict[f'feat_cond_{task}'] = ddp_allgather(store_dict[f'feat_cond_{task}'])
-        if task=='tv':
-            score_matrix_t_cond = torch.matmul(feat_t, feat_v.permute(1,0))
-        elif task=='ta':
-            score_matrix_t_cond = torch.matmul(feat_t, feat_a.permute(1,0))
+
+        if task == 'tv':
+            score_matrix_t_cond = torch.matmul(feat_t, feat_v.permute(1, 0))
+        elif task == 'ta':
+            score_matrix_t_cond = torch.matmul(feat_t, feat_a.permute(1, 0))
+
         store_dict[f'score_matrix_t_cond_{task}'] = score_matrix_t_cond
         log = compute_metric_ret(score_matrix_t_cond, ids, ids_txt, direction='forward')
-        log = {k.replace('forward','video'): v for k,v in log.items()}
+        log = {k.replace('forward', 'video'): v for k, v in log.items()}
+
         if model.config.ret_bidirection_evaluation:
             log2 = compute_metric_ret(score_matrix_t_cond, ids, ids_txt, direction='backward')
-            log2 = {k.replace('backward','txt'): v for k,v in log2.items()}
+            log2 = {k.replace('backward', 'txt'): v for k, v in log2.items()}
             log.update(log2)
 
         val_log[f'ret_itc_{task}'] = log
 
-
     #### compute itm_score
     for task in subtasks:
-        if  task == "tvas" or task == "tva":
+        if task == "tvas" or task == "tva":
             continue
-        if task!="tvas" and task!="tva":
-            store_dict[f'condition_feats_{task}'] = torch.cat(store_dict[f'condition_feats_{task}'],dim=0)
+
+        if task != "tvas" and task != "tva":
+            store_dict[f'condition_feats_{task}'] = torch.cat(
+                store_dict[f'condition_feats_{task}'], dim=0
+            )
+
         itm_rerank_num = model.config.itm_rerank_num
-        score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, store_dict[f'score_matrix_t_cond_{task}'], model, itm_rerank_num, direction='forward')
+        score_matrix = refine_score_matrix(
+            store_dict[f'condition_feats_{task}'],
+            input_ids,
+            attention_mask,
+            store_dict[f'score_matrix_t_cond_{task}'],
+            model,
+            itm_rerank_num,
+            direction='forward'
+        )
         log = compute_metric_ret(score_matrix, ids, ids_txt, direction='forward')
-        log = {k.replace('forward','video'): v for k,v in log.items()}
+        log = {k.replace('forward', 'video'): v for k, v in log.items()}
 
         if model.config.ret_bidirection_evaluation:
-            score_matrix = refine_score_matrix(store_dict[f'condition_feats_{task}'], input_ids, attention_mask, store_dict[f'score_matrix_t_cond_{task}'], model, itm_rerank_num, direction='backward')
+            score_matrix = refine_score_matrix(
+                store_dict[f'condition_feats_{task}'],
+                input_ids,
+                attention_mask,
+                store_dict[f'score_matrix_t_cond_{task}'],
+                model,
+                itm_rerank_num,
+                direction='backward'
+            )
             log2 = compute_metric_ret(score_matrix, ids, ids_txt, direction='backward')
-            log2 = {k.replace('backward','txt'): v for k,v in log2.items()}
+            log2 = {k.replace('backward', 'txt'): v for k, v in log2.items()}
             log.update(log2)
 
         val_log[f'ret_itm_{task}'] = log
@@ -354,7 +590,7 @@ def evaluate_ret(model, tasks, val_loader, global_step):
         wandb.log(val_log)
         
     return val_log
-
+    
 def refine_score_matrix(condition_feats, input_ids, attention_mask, score_matrix_t_cond, model, itm_rerank_num, direction='forward'):
 
     top_k = itm_rerank_num
