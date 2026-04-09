@@ -923,3 +923,8 @@ class GRAM(MMGeneralModule):
 
             return loss_dict
           
+    def encode_video(self, batch):
+        return self.batch_get(batch, 'feat_v')
+
+    def encode_text(self, batch):
+        return self.batch_get(batch, 'feat_t')

@@ -380,17 +380,17 @@ def evaluate_ret(model, tasks, val_loader, global_step):
         batch = edict(batch)
         evaluation_dict = model(batch, tasks, compute_loss=False)
 
-        feat_t.append(evaluation_dict['feat_t'])
-        feat_a.append(evaluation_dict['feat_a'])
-        feat_v.append(evaluation_dict['feat_v'])
+        feat_t.append(evaluation_dict['feat_t'].detach().cpu())
+        feat_a.append(evaluation_dict['feat_a'].detach().cpu())
+        feat_v.append(evaluation_dict['feat_v'].detach().cpu())
 
         if 'feat_s' in evaluation_dict.keys():
-            feat_s.append(evaluation_dict['feat_s'])
+            feat_s.append(evaluation_dict['feat_s'].detach().cpu())
         if 'feat_d' in evaluation_dict.keys():
-            feat_d.append(evaluation_dict['feat_d'])
+            feat_d.append(evaluation_dict['feat_d'].detach().cpu())
       
-        input_ids.append(evaluation_dict['input_ids'])
-        attention_mask.append(evaluation_dict['attention_mask'])
+        input_ids.append(evaluation_dict['input_ids'].detach().cpu())
+        attention_mask.append(evaluation_dict['attention_mask'].detach().cpu())
         ids += batch.ids
 
         if 'ids_txt' in batch:
@@ -404,7 +404,7 @@ def evaluate_ret(model, tasks, val_loader, global_step):
   
         for task in subtasks:
             store_dict[f'condition_feats_{task}'].append(
-                evaluation_dict[f'condition_feats_{task}']
+                evaluation_dict[f'condition_feats_{task}'].detach().cpu()
             )
 
     ids = [j for i in all_gather_list(ids) for j in i]
@@ -580,11 +580,17 @@ def evaluate_ret(model, tasks, val_loader, global_step):
         if task == "tvas" or task == "tva":
             continue
 
-        if task != "tvas" and task != "tva":
-            store_dict[f'condition_feats_{task}'] = torch.cat(
-                store_dict[f'condition_feats_{task}'], dim=0
-            )
+        # if task != "tvas" and task != "tva":
+        #     store_dict[f'condition_feats_{task}'] = torch.cat(
+        #         store_dict[f'condition_feats_{task}'], dim=0
+        #     )
 
+        if task != "tvas" and task != "tva":
+            if isinstance(store_dict[f'condition_feats_{task}'], list):
+                store_dict[f'condition_feats_{task}'] = torch.cat(
+                    store_dict[f'condition_feats_{task}'], dim=0
+                )
+            store_dict[f'condition_feats_{task}'] = store_dict[f'condition_feats_{task}'][:max_query]
         itm_rerank_num = model.config.itm_rerank_num
         score_matrix = refine_score_matrix(
             store_dict[f'condition_feats_{task}'],
